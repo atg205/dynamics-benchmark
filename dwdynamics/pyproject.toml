@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "dwdynamics"
+version = "0.1.0"
+description = ""
+authors = ["Konrad Jałowiecki <dexter2206@gmail.com>", "Philipp Hanussek <philipp.hanussek@etu.sorbonne-universite.fr"]
+readme = "README.md"
+packages = [{include = "dwdynamics", from = "src"}]
+
+
+[tool.poetry.dependencies]
+python = "^3.11"
+numpy = "^2.1.2"
+dimod = "^0.12.17"
+qutip = "^5.0.4"
+matplotlib = "^3.9.2"
+dwave-system = "^1.27.0"
+pandas = "^2.2.2"
+tqdm = "^4.66.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
