@@ -730,7 +730,7 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.11"
-content-hash = "570c0ce0c889401c9330385da9e9a3c0a9ec3af376a93748b2964a5e515d8c4f"
+content-hash = "be4a23d5bd9c7b18f454f7a2d0543939fc4a03bdfd730f2bdba4fc1d39e1997a"
 
 [metadata.files]
 annotated-types = []

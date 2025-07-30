@@ -11,7 +11,7 @@ from .instance import BenchmarkInstance
 class TestCase(ABC):
     name: str
     system: int
-    solver: str
+    sampler: str
     precision: int
     timepoints: int
 
@@ -52,7 +52,7 @@ class QuantumTestCase(TestCase):
 
     def sample_qubo(self, qubo, num_samples: int = 1000, annealing_time: int = 200):
         """Sample from QUBO using quantum hardware."""
-        if self.sampler is 'Neal':
+        if self.sampler == 'neal':
             # If no sampler specified, use SimulatedAnnealingSampler
             sampler = neal.SimulatedAnnealingSampler()
             return sampler.sample(qubo, num_reads=num_samples)
@@ -65,7 +65,7 @@ class QuantumTestCase(TestCase):
         elif self.sampler == "6.4":
             dw_sampler = EmbeddingComposite(DWaveSampler(solver="Advantage_system6.4"))
         else:
-            raise ValueError(f"Invalid solver id: {self.solver}")
+            raise ValueError(f"Invalid solver id: {self.sampler}")
 
         return dw_sampler.sample(qubo, num_reads=num_samples, annealing_time=annealing_time, return_embedding=True)
 
@@ -79,7 +79,10 @@ class QuantumTestCase(TestCase):
         sampleset = self.sample_qubo(instance.qubo)
         
         df = sampleset.to_pandas_dataframe() 
-        computation_time = sampleset.info['timing']['qpu_access_time'] * 1e-3
+        if self.sampler == 'neal':
+            computation_time = sampleset.info['timing']['sampling_ns'] * 1e-3
+        else:
+            computation_time = sampleset.info['timing']['qpu_access_time'] * 1e-3
 
         return BenchmarkResult(
             result = df,

@@ -3,13 +3,18 @@ name = "benchmarker"
 version = "0.1.0"
 description = "DWDynamics Benchmarker"
 authors = ["Philipp Hanussek <p.hanussek@etu.sorbonne-universite.fr>"]
+packages = [{include = "benchmarker", from = "../"}]
+
 
 [tool.poetry.dependencies]
 python = "^3.11"
 dwdynamics = { path = "../dwdynamics", develop = true }
 dwave-neal = "^0.6.0"
+pandas = "^2.3.1"
+numpy = "^2.3.2"
 
-[tool.poetry.dev-dependencies]
+
+
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

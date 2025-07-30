@@ -23,7 +23,7 @@ class BenchmarkInstance:
             hamiltonian=self.H,
             initial_state=self.psi0,
             times=tuple(range(number_time_points)),
-            num_bits_per_var=precision
+            num_bits_per_var=self.precision
         )
         self.qubo = self.problem.qubo(objective=self.objective)
 
