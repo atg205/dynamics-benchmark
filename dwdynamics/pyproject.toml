@@ -2,7 +2,7 @@
 name = "dwdynamics"
 version = "0.1.0"
 description = ""
-authors = ["Konrad Jałowiecki <dexter2206@gmail.com>", "Philipp Hanussek <philipp.hanussek@etu.sorbonne-universite.fr"]
+authors = ["Konrad Jałowiecki <dexter2206@gmail.com>"]
 readme = "README.md"
 packages = [{include = "dwdynamics", from = "src"}]
 

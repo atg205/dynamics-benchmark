@@ -7,6 +7,7 @@ authors = ["Philipp Hanussek <p.hanussek@etu.sorbonne-universite.fr>"]
 [tool.poetry.dependencies]
 python = "^3.11"
 dwdynamics = { path = "../dwdynamics", develop = true }
+dwave-neal = "^0.6.0"
 
 [tool.poetry.dev-dependencies]
 

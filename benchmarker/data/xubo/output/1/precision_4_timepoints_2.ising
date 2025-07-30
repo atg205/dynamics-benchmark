@@ -1,0 +1,12 @@
+Running xubo_ising --all-states with file='data/xubo/ising/1/precision_4_timepoints_2.ising'
+	Number of h terms: 32
+	Number of J terms: 112
+	Number of qubits: 32
+	Number of states: 4294967296
+	Ising energy scaling factor: 1
+Resources:
+	Number of GPUs: 0
+	Number of GPU threads: 8192
+	Number of OpenMP threads: 12
+Parameters:
+	numstates: 1024

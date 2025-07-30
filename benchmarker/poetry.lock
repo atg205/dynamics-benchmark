@@ -166,6 +166,17 @@ nlm = ["dwave-optimization (>=0.1.0,<0.5)", "numpy (>=1.20.0)"]
 mocks = ["dwave-networkx (>=0.8.10)"]
 
 [[package]]
+name = "dwave-neal"
+version = "0.6.0"
+description = "General Ising graph simulated annealing solver"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+dwave-samplers = ">=1.0.0,<2.0.0"
+
+[[package]]
 name = "dwave-networkx"
 version = "0.8.18"
 description = "A NetworkX extension providing graphs and algorithms relevant to working with the D-Wave System"
@@ -719,7 +730,7 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.11"
-content-hash = "8208d5ed72e60c9a69e3f386ca47859f3208b6e955eb02b074e6672f5949ed9b"
+content-hash = "570c0ce0c889401c9330385da9e9a3c0a9ec3af376a93748b2964a5e515d8c4f"
 
 [metadata.files]
 annotated-types = []
@@ -735,6 +746,7 @@ cycler = []
 dimod = []
 diskcache = []
 dwave-cloud-client = []
+dwave-neal = []
 dwave-networkx = []
 dwave-optimization = []
 dwave-preprocessing = []

@@ -1,8 +1,10 @@
 import os
 import json
 from typing import Dict, Any
+from .results import BenchmarkResult
 
-def save_benchmark_result(system: str, solver: str, precision: int, timepoints: int, result: Dict[str, Any]):
+
+def save_benchmark_result(system: int, solver: str, precision: int, timepoints: int, result: BenchmarkResult):
     """
     Save benchmark result to results/<system>/<solver>/precision_<p>_timepoints_<t>.json
     Args:
