@@ -162,3 +162,86 @@ class ResultsLoader:
         df['system'] = system
         df['source'] = 'VELOX'
         return df
+    
+
+    def get_dwave_success_rates(self,system: int,topology="6.4",ta=200,grouped=True,file_limit=np.inf)->pd.DataFrame:
+        """
+        Load D-Wave success rates for a given system and topology.
+
+        Args:
+            system (int): System identifier.
+            topology (str): Topology string.
+            ta (int): Annealing time.
+            grouped (bool): If True, group results by precision, timepoints, topology.
+            file_limit (int): Maximum number of files to process.
+
+        Returns:
+            pd.DataFrame: DataFrame containing success rates and related info.
+        """
+        path = os.path.join(self.base_path, str(system),topology)
+        dfs = []
+        df_dict = defaultdict(list)
+        for topology in [topology]:
+            path = os.path.join(self.base_path, str(system),topology)
+
+            file_counter = 0
+            for file in os.listdir(path):
+                if file_counter >= file_limit:
+                    break
+                with open(os.path.join(path,file),'r') as f:
+                    s = dimod.SampleSet.from_serializable(json.load(f))
+                
+                if topology=='neal':
+                    qpu_access_time = s.info['timing']['sampling_ns']
+                    annealing_time = 0
+                else:
+                    qpu_access_time = s.info['timing']['qpu_access_time']
+                    annealing_time = s.info['timing']['qpu_anneal_time_per_sample']
+                    if not ta == annealing_time:
+                        continue
+                
+                file_counter+=1
+                
+                df_dict['precision'].append(int(re.findall(r'(?<=precision_)\d+',file)[0]))
+                df_dict['timepoints'].append(int(re.findall(r'(?<=timepoints_)\d+',file)[0]))
+                df = s.to_pandas_dataframe()
+                df['energy'] = abs(round(df['energy'],10))
+                df = df[['energy','num_occurrences']].groupby(by=["energy"]).sum().reset_index()
+                if len(df[df.energy== 0]) == 0:
+                    success_rate = 0.0
+                else:
+                    success_rate = int(df[df.energy == 0]['num_occurrences'].iloc[0])
+                success_rate /= df['num_occurrences'].sum()
+                access_time = qpu_access_time / df['num_occurrences'].sum() * 1e-3
+                df_dict['topology'].append(topology)
+                df_dict['success_prob'].append(success_rate)
+                df_dict['runtime'].append(access_time)
+                df_dict['num_var'].append(len(s.variables))
+                dfs.append(pd.DataFrame(df_dict))
+        dfs_all = pd.concat(dfs)
+        if grouped:
+            dfs_all = dfs_all.groupby(['precision','timepoints','topology']).mean().reset_index()
+        return dfs_all
+    
+
+    def get_dwave_sample_set(self,system: int, timepoints: int, topology="1.4") -> pd.DataFrame:
+        path = os.path.join(self.base_path, str(system),topology)
+        min_energy = np.inf
+        return_sample =None
+        for file in os.listdir(path):
+            file_tp = int(re.findall(r'(?<=timepoints_)\d+',file)[0])
+            if not file_tp == timepoints:
+                continue
+
+            with open(os.path.join(path,file),'r') as f:
+                s = dimod.SampleSet.from_serializable(json.load(f))
+            
+            if np.round(s.first.energy,12) == 0:
+                return s
+            elif s.first.energy < min_energy:
+                return_sample = s
+                min_energy =s.first.energy
+        if return_sample is None:
+            raise ValueError('No samples for system/timepoints/topology combination found')
+        else:
+            return return_sample
