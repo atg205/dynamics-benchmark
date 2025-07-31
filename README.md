@@ -21,27 +21,18 @@ This project provides tools for:
 ### Requirements
 - Python 3.11+
 - Poetry (recommended) or pip
-
+It is recommended to use a python virtual environment.
 ### Using Poetry (recommended)
 ```bash
 # Clone the repository
 git clone https://github.com/atg205/dynamics-benchmark.git
-cd dynamics-benchmark/benchmarker
 
 # Install poetry if you haven't already
 pip install poetry
 
 # Install dependencies
-poetry install
-
-# For development (editable install)
-pip install -e .
-```
-
-### Using pip
-```bash
 cd dynamics-benchmark/benchmarker
-pip install -r requirements.txt
+poetry install
 
 # For development (editable install)
 pip install -e .
