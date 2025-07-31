@@ -1,6 +1,12 @@
 # Quantum Dynamics Benchmarking Framework
 
+**Authors:** Philipp Hanussek, Jakub Pawłowski, Zakaria Mzaouali, Bartłomiej Gardas
+
+This repository accompanies the paper *Solving quantum-inspired dynamics on quantum and classical computers*.
+
 A framework for benchmarking different approaches to solving quantum dynamics problems, with a focus on comparing quantum annealing and classical methods.
+
+
 
 ## Overview
 
