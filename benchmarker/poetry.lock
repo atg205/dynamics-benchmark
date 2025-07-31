@@ -546,6 +546,34 @@ python-versions = ">=3.9"
 diagrams = ["railroad-diagrams", "jinja2"]
 
 [[package]]
+name = "pyqt6"
+version = "6.9.1"
+description = "Python bindings for the Qt cross platform application toolkit"
+category = "main"
+optional = false
+python-versions = ">=3.9"
+
+[package.dependencies]
+PyQt6-Qt6 = ">=6.9.0,<6.10.0"
+PyQt6-sip = ">=13.8,<14"
+
+[[package]]
+name = "pyqt6-qt6"
+version = "6.9.1"
+description = "The subset of a Qt installation needed by PyQt6."
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
+name = "pyqt6-sip"
+version = "13.10.2"
+description = "The sip module support for PyQt6"
+category = "main"
+optional = false
+python-versions = ">=3.9"
+
+[[package]]
 name = "pysocks"
 version = "1.7.1"
 description = "A Python SOCKS client module. See https://github.com/Anorov/PySocks for more information."
@@ -730,7 +758,7 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.11"
-content-hash = "be4a23d5bd9c7b18f454f7a2d0543939fc4a03bdfd730f2bdba4fc1d39e1997a"
+content-hash = "81ac4a01f7f60ec6dcf70c5c5c717ffd9eed025d4749553e1a91c953f7518558"
 
 [metadata.files]
 annotated-types = []
@@ -773,6 +801,9 @@ pycparser = []
 pydantic = []
 pydantic-core = []
 pyparsing = []
+pyqt6 = []
+pyqt6-qt6 = []
+pyqt6-sip = []
 pysocks = []
 python-dateutil = []
 pytz = []

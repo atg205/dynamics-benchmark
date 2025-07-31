@@ -6,7 +6,7 @@ from dwdynamics import ComplexDynamicsProblem, Objective
 
 
 class BenchmarkInstance:
-    def __init__(self, instance_id: int, number_time_points: int, objective: Any = Objective.hessian, basepath: str = "", data_dir: str = "data/instances"):
+    def __init__(self, instance_id: int, number_time_points: int, objective: Any = Objective.hessian, basepath: str = "", data_dir: str = "benchmarker/data/instances"):
         self.instance_id = instance_id
         self.objective = objective
         self.objective_path = 'norm' if objective == Objective.norm else 'hessian'
@@ -27,7 +27,7 @@ class BenchmarkInstance:
         )
         self.qubo = self.problem.qubo(objective=self.objective)
 
-    def save_qubo(self, basepath: str = "", save_dir: str = "data/instances"):
+    def save_qubo(self, basepath: str = "", save_dir: str = "benchmarker/data/instances"):
         if self.qubo is None:
             raise ValueError("QUBO not created yet.")
         path = os.path.join(basepath, save_dir, self.objective_path, str(self.instance_id))

@@ -6,7 +6,7 @@ class BenchmarkRunner:
     """
     Runs a suite of TestCase instances and collects their results.
     """
-    def __init__(self, test_cases: [TestCase]):
+    def __init__(self, test_cases: List[TestCase]):
         self.test_cases = test_cases
         self.results: List[BenchmarkResult] = []
 

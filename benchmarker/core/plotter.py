@@ -4,6 +4,9 @@ from typing import List, Optional
 import os
 from .results import BenchmarkResult
 import matplotlib as mpl
+from benchmarker.core import results_loader
+import pandas as pd
+from scipy.stats import linregress
 
 
 class BenchmarkPlotter:
@@ -102,3 +105,70 @@ class BenchmarkPlotter:
             ), bbox_inches='tight')
         plt.show(block=True)
         #plt.close()
+
+    def plot_tts(self):
+        fig, ax = plt.subplots(figsize=(8, 4))
+        colors = plt.cm.tab10.colors  # do 10 systemów
+        systems = [i for i in range(1,10)]
+        systems = [2,3,4,6,8]
+        ALL_dfs = []
+        native_systems = [1,2,5,6,7]
+        loader = results_loader.ResultsLoader()
+
+        for idx, system in enumerate(native_systems):
+            velox_tts = loader.get_velox_tts(system)
+            dwave_14_tts = loader.get_dwave_tts(system,topology='1.4',file_limit=20)
+            dwave_64_tts = loader.get_dwave_tts(system,topology='6.4',file_limit=20)
+
+            color = colors[idx % len(colors)]
+
+            print("--------------")
+            print(f"System {system}")
+            #print(velox_tts)
+            ax.plot(velox_tts['num_var'], velox_tts['tts99'],
+                    marker='o', linestyle='None', color=colors[0], label=f'velox' if system==0 else None)
+            
+            ax.plot(dwave_14_tts['num_var'], dwave_14_tts['tts99'],
+                    marker='s', linestyle='None', color=colors[1],label='14' if system==0 else None)
+            
+            ax.plot(dwave_64_tts['num_var'], dwave_64_tts['tts99'],
+                    marker='^', linestyle='None', color=colors[2],label='64' if system==0 else None)
+            ALL_dfs.append(velox_tts)
+            ALL_dfs.append(dwave_14_tts)
+            ALL_dfs.append(dwave_64_tts)
+        sources = ['VELOX','1.4', '6.4']
+        linestyles = ['-','-','-']
+        all_system_dfs = pd.concat(ALL_dfs,axis=0)
+        native_system_df = all_system_dfs[all_system_dfs.system.isin(native_systems)]
+
+        for i,source in enumerate(sources):
+
+            native_system_df_filtered = native_system_df[native_system_df.source == source]
+            num_var = np.array(native_system_df_filtered['num_var'])       
+            TTS99 = np.array(native_system_df_filtered['tts99'])           
+
+            mask = np.isfinite(TTS99)
+            num_var_clean = num_var[mask]
+            TTS99_clean = TTS99[mask]
+            log_TTS99 = np.log(TTS99_clean)
+
+            slope, intercept, r_value, p_value, std_err = linregress(num_var_clean, log_TTS99)
+
+            r_TTS99 = slope
+            D =np.exp(intercept)
+            t = D * np.exp(r_TTS99 * num_var)
+
+            TTS99_fit = D * np.exp(r_TTS99 * num_var)
+            ax.plot(num_var, TTS99_fit, linestyle=linestyles[i], color=colors[i], label=f'{source} r_TTS99={abs(np.round(r_TTS99,2))}')    
+
+        plt.legend()
+        ax.set_xlabel(r'$N$')
+        ax.set_ylabel('TTS99 [ms]')
+        plt.yscale('log')
+        ax.grid(True)
+        plt.tight_layout()
+        #plt.savefig(f'../plots/tta_overview.pdf' ,bbox_inches='tight')
+        #ax.set_ylim(0,1e6)
+        ylims = ax.get_ylim()
+
+        plt.show(block=True)

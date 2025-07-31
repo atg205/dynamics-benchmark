@@ -3,9 +3,16 @@ import os
 import json
 import pandas as pd
 from .results import BenchmarkResult
+import numpy as np
+import dimod
+from collections import defaultdict
+import re
+import math
+from scipy.stats import linregress
+
 
 class ResultsLoader:
-    def __init__(self, base_path: str = "results"):
+    def __init__(self, base_path: str = "benchmarker/data/results/hessian"):
         self.base_path = base_path
     
     def load_result(self, system: int, solver: str, precision: int, timepoints: int) -> Optional[BenchmarkResult]:
@@ -48,3 +55,110 @@ class ResultsLoader:
                         ))
                         
         return results
+    
+
+    def return_tts(self,p_success: float,t:float, p_target=0.99)->float:
+        """
+        Calculate the time-to-solution (TTS) for a given success probability.
+
+        Args:
+            p_success (float): Success probability per run.
+            t (float): Time per run.
+            p_target (float): Target cumulative success probability (default 0.99).
+
+        Returns:
+            float: Estimated time to reach target success probability.
+        """
+        if p_success == 0:
+            return np.inf
+        if p_success == 1:
+            return t
+        return (math.log(1-p_target) / math.log(1-p_success))*t
+
+
+    def get_dwave_tts(self, system: int,topology="6.4",file_limit=np.inf)->pd.DataFrame:
+
+        path = os.path.join(self.base_path, str(system),topology)
+        df_dict = defaultdict(list)
+        file_counter = 0
+        for file in os.listdir(path):
+            #if file_counter >= file_limit:
+            #   break
+            with open(os.path.join(path,file),'r') as f:
+                s = dimod.SampleSet.from_serializable(json.load(f))
+            
+            # Append Metadata
+            qpu_access_time = s.info['timing']['qpu_access_time'] * 1e-3
+            annealing_time = s.info['timing']['qpu_anneal_time_per_sample']
+            precision = int(re.findall(r'(?<=precision_)\d+',file)[0])
+            timepoints = int(re.findall(r'(?<=timepoints_)\d+',file)[0])
+            
+            df_dict['runtime'].append(qpu_access_time)
+            df_dict['ta'].append(annealing_time)
+            df_dict['precision'].append(precision)
+            df_dict['timepoints'].append(timepoints)
+            df_dict['num_var'].append(len(s.variables))
+
+            sampleset = s.to_pandas_dataframe()
+            sampleset['energy'] = abs(round(sampleset['energy'],10))
+            success = len(sampleset[sampleset.energy== 0]) > 0
+            
+            df_dict['success'].append(success)
+        
+        df = pd.DataFrame.from_dict(df_dict)
+        #return df
+        df =df.groupby(['ta','precision','timepoints','num_var']).agg(
+            success_sum=('success','sum'),
+            runtime=('runtime','mean'),
+            shots=('success','count')
+        ).reset_index()
+        df['success_prob'] = df['success_sum'] / df['shots']
+        df['tts99'] = df.apply(lambda row: self.return_tts(row['success_prob'],row.runtime),axis=1)
+        df = df[['precision','timepoints','num_var','tts99']].groupby(['precision','timepoints','num_var']).min().reset_index()
+        df['source'] = topology
+        df['system'] = system
+        return df
+    
+
+    def get_velox_results(self,system: int)->pd.DataFrame:
+        """
+        Load Velox results for a given system from CSV and parse relevant fields.
+
+        Args:
+            system (int): System identifier.
+
+        Returns:
+            pd.DataFrame: DataFrame containing parsed results.
+        """
+        path = os.path.join(self.base_path, f'{system}/velox/best_results_hessian_{system}_native.csv')
+        df = pd.read_csv(path)
+        df_dict= defaultdict(list)
+        for row in df.itertuples():
+            precision, timepoints = re.findall(r'\d+',str(row.instance))
+            df_dict['precision'].append(int(precision))
+            df_dict['timepoints'].append(int(timepoints))
+            df_dict['num_steps'].append(int(row.num_steps))
+            df_dict['runtime'].append(float(row.runtime)*1e3)
+            df_dict['gap'].append(float(row.gap))
+            df_dict['num_rep'].append(int(row.num_rep))
+            df_dict['success_prob'].append(float(row.success_prob))
+            df_dict['solution'].append(row.best_solution.replace("-1","0").replace(';',''))
+            df_dict['num_var'].append(int(row.num_var))
+        return pd.DataFrame(df_dict)
+
+    def get_velox_tts(self,system:int)->pd.DataFrame:
+        """
+        Compute Velox success rates for a given system.
+
+        Args:
+            system (int): System identifier.
+
+        Returns:
+            pd.DataFrame: DataFrame containing aggregated success rates and runtimes.
+        """
+        df = self.get_velox_results(system=system)
+        df['tts99'] = df.apply(lambda row: self.return_tts(row['success_prob'],row.runtime),axis=1)
+        df = df[['precision','timepoints','num_var','tts99']].groupby(['precision','timepoints','num_var']).min().reset_index()
+        df['system'] = system
+        df['source'] = 'VELOX'
+        return df
