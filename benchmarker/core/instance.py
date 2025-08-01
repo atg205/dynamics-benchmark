@@ -39,6 +39,7 @@ class BenchmarkInstance:
             num_bits_per_var=self.precision
         )
         self.qubo = self.problem.qubo(objective=self.objective)
+        self.save_qubo()
 
     def save_qubo(self, save_path: Optional[Path] = None):
         """
@@ -56,5 +57,6 @@ class BenchmarkInstance:
         ensure_dir(qubo_path)
         
         file_path = qubo_path / f"precision_{self.precision}_timepoints_{self.number_time_points}.json"
+        qubo_path.mkdir(exist_ok=True)
         with file_path.open('w') as f:
             json.dump(self.qubo.to_serializable(), f)

@@ -14,7 +14,7 @@ from ..config import PLOTS_DIR, ensure_dir
 
 
 class BenchmarkPlotter:
-    def __init__(self, output_dir: Optional[Path] = None):
+    def __init__(self, output_dir: Optional[Path] = None,grid=True):
         """
         Initialize the BenchmarkPlotter.
         
@@ -23,7 +23,7 @@ class BenchmarkPlotter:
         """
         self.output_dir = output_dir if output_dir else PLOTS_DIR
         ensure_dir(self.output_dir)
-        self._setup_style()
+        self._setup_style(grid=grid)
     
     def _setup_style(self,fontsize=15,scale=1.0,grid=True):
 # Publication-quality (TikZ-like) matplotlib style setup
@@ -88,7 +88,7 @@ class BenchmarkPlotter:
         plt.show(block=True)
         #plt.close()
 
-    def plot_tts(self, systems: List[int] = [1,2,4,5,6,7], file_limit: int = 20,num_reps=0):
+    def plot_tts(self, systems: List[int] = [1,2,3,4,5,6,7], file_limit: int = 20,num_reps=0):
         """Plot time-to-solution comparisons for multiple systems."""
         self._setup_style(grid=True)
         fig, ax = plt.subplots(figsize=(8, 4))
@@ -210,9 +210,6 @@ class BenchmarkPlotter:
 
 
     def plot_dynamics(self, system,timepoints=3):
-
-        self._setup_style(fontsize=16,grid=False)
-
         loader = results_loader.ResultsLoader()
 
         SZ = np.array([[1, 0], [0, -1]])

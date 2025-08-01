@@ -87,32 +87,38 @@ class ResultsLoader:
         """Get D-Wave time-to-solution data for a specific system and topology."""
         path = self.base_path / str(system) / topology
         df_dict = defaultdict(list)
-        file_counter = 0
+        file_counter = defaultdict(int)
 
         if not path.exists():
             return pd.DataFrame()
 
         for file_path in path.glob('*.json'):
-            #if file_counter >= file_limit:
-             #   break
-                
+           
             with file_path.open('r') as f:
                 s = dimod.SampleSet.from_serializable(json.load(f))
             if num_reps > 0 and num_reps != s.to_pandas_dataframe()['num_occurrences'].sum():
                 continue
+          
             # Append Metadata
             qpu_access_time = s.info['timing']['qpu_access_time'] * 1e-3
             annealing_time = s.info['timing']['qpu_anneal_time_per_sample']
             precision = int(re.findall(r'(?<=precision_)\d+', file_path.name)[0])
             timepoints = int(re.findall(r'(?<=timepoints_)\d+', file_path.name)[0])
-
+            if file_counter[(system, timepoints)] >= file_limit:
+                continue
+            file_counter[(system,timepoints)] += 1
             
             df_dict['runtime'].append(qpu_access_time)
             df_dict['ta'].append(annealing_time)
             df_dict['precision'].append(precision)
             df_dict['timepoints'].append(timepoints)
-            df_dict['num_var'].append(len(s.variables))
+            #if topology=='1.4':
+             #   num_vars = sum([len(value) for value in s.info['embedding_context']['embedding'].values()]) 
+              #  df_dict['num_var'].append(num_vars)
 
+            #else:
+                #df_dict['num_var'].append(len(s.variables))
+            df_dict['num_var'].append(len(s.variables))
             sampleset = s.to_pandas_dataframe()
             sampleset['energy'] = abs(round(sampleset['energy'],10))
             success = len(sampleset[sampleset.energy== 0]) > 0
