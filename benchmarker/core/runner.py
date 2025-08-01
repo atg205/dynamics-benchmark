@@ -16,6 +16,10 @@ class BenchmarkRunner:
             result = case.run()
             self.results.append(result)
         return self.results 
+    
+    def run_and_save(self):
+        for case in self.test_cases:
+            case.run_and_save()
 
     def summary(self) -> Dict[str, Any]:
         return {
