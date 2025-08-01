@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from typing import List, Optional
-import os
+from pathlib import Path
 from .results import BenchmarkResult
 import matplotlib as mpl
 from benchmarker.core import results_loader, instance
@@ -10,11 +10,19 @@ from scipy.stats import linregress
 from tqdm import tqdm
 import qutip as qp
 import math
+from ..config import PLOTS_DIR, ensure_dir
+
 
 class BenchmarkPlotter:
-    def __init__(self, output_dir: str = "benchmarker/plots"):
-        self.output_dir = output_dir
-        os.makedirs(output_dir, exist_ok=True)
+    def __init__(self, output_dir: Optional[Path] = None):
+        """
+        Initialize the BenchmarkPlotter.
+        
+        Args:
+            output_dir: Optional custom output directory. If None, uses the default plots directory.
+        """
+        self.output_dir = output_dir if output_dir else PLOTS_DIR
+        ensure_dir(self.output_dir)
         self._setup_style()
     
     def _setup_style(self,fontsize=15,scale=1.0,grid=True):
@@ -75,17 +83,17 @@ class BenchmarkPlotter:
         ax.legend()
         
         if save:
-            plt.savefig(os.path.join(
-                self.output_dir,
-                'results_comparison.pdf'
-            ), bbox_inches='tight')
+            save_path = self.output_dir / 'results_comparison.pdf'
+            plt.savefig(save_path, bbox_inches='tight')
         plt.show(block=True)
         #plt.close()
 
-    def plot_tts(self,systems=[1,2,5,6,7],file_limit=20):
+    def plot_tts(self, systems: List[int] = [1,2,5,6,7], file_limit: int = 20):
+        """Plot time-to-solution comparisons for multiple systems."""
         self._setup_style(grid=True)
         fig, ax = plt.subplots(figsize=(8, 4))
-        colors = plt.cm.tab10.colors  # do 10 systemów
+        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
+                 '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
         ALL_dfs = []
         loader = results_loader.ResultsLoader()
 

@@ -1,5 +1,5 @@
 from typing import Dict, List, Optional
-import os
+from pathlib import Path
 import json
 import pandas as pd
 from .results import BenchmarkResult
@@ -9,17 +9,23 @@ from collections import defaultdict
 import re
 import math
 from scipy.stats import linregress
+from ..config import HESSIAN_RESULTS_DIR, ensure_dir
 
 
 class ResultsLoader:
-    def __init__(self, base_path: str = "benchmarker/data/results/hessian"):
-        self.base_path = base_path
+    def __init__(self, base_path: Optional[Path] = None):
+        """
+        Initialize the ResultsLoader.
+        
+        Args:
+            base_path: Optional custom base path. If None, uses default from config.
+        """
+        self.base_path = base_path if base_path else HESSIAN_RESULTS_DIR
     
     def load_result(self, system: int, solver: str, precision: int, timepoints: int) -> Optional[BenchmarkResult]:
         """Load a specific benchmark result"""
-        path = os.path.join(self.base_path, str(system), str(solver), 
-                          f"precision_{precision}_timepoints_{timepoints}.json")
-        if not os.path.exists(path):
+        path = self.base_path / str(system) / str(solver) / f"precision_{precision}_timepoints_{timepoints}.json"
+        if not path.exists():
             return None
             
         with open(path, 'r') as f:
@@ -34,25 +40,26 @@ class ResultsLoader:
     def load_all_results(self, system: int) -> Dict[str, List[BenchmarkResult]]:
         """Load all results for a given system"""
         results = {}
-        system_path = os.path.join(self.base_path, str(system))
+        system_path = self.base_path / str(system)
         
-        if not os.path.exists(system_path):
+        if not system_path.exists():
             return results
             
-        for solver in os.listdir(system_path):
-            results[solver] = []
-            solver_path = os.path.join(system_path, solver)
+        for solver in system_path.iterdir():
+            if not solver.is_dir():
+                continue
+                
+            results[solver.name] = []
             
-            for result_file in os.listdir(solver_path):
-                if result_file.endswith('.json'):
-                    with open(os.path.join(solver_path, result_file), 'r') as f:
-                        data = json.load(f)
-                        results[solver].append(BenchmarkResult(
-                            result=pd.DataFrame(data['result']),
-                            system=data['system'],
-                            ta=data['ta'],
-                            computation_time=data['computation_time']
-                        ))
+            for result_file in solver.glob('*.json'):
+                with result_file.open('r') as f:
+                    data = json.load(f)
+                    results[solver.name].append(BenchmarkResult(
+                        result=pd.DataFrame(data['result']),
+                        system=data['system'],
+                        ta=data['ta'],
+                        computation_time=data['computation_time']
+                    ))
                         
         return results
     
@@ -76,22 +83,27 @@ class ResultsLoader:
         return (math.log(1-p_target) / math.log(1-p_success))*t
 
 
-    def get_dwave_tts(self, system: int,topology="6.4",file_limit=np.inf)->pd.DataFrame:
-
-        path = os.path.join(self.base_path, str(system),topology)
+    def get_dwave_tts(self, system: int, topology: str = "6.4", file_limit: float = np.inf) -> pd.DataFrame:
+        """Get D-Wave time-to-solution data for a specific system and topology."""
+        path = self.base_path / str(system) / topology
         df_dict = defaultdict(list)
         file_counter = 0
-        for file in os.listdir(path):
-            #if file_counter >= file_limit:
-            #   break
-            with open(os.path.join(path,file),'r') as f:
+
+        if not path.exists():
+            return pd.DataFrame()
+
+        for file_path in path.glob('*.json'):
+            if file_counter >= file_limit:
+                break
+                
+            with file_path.open('r') as f:
                 s = dimod.SampleSet.from_serializable(json.load(f))
             
             # Append Metadata
             qpu_access_time = s.info['timing']['qpu_access_time'] * 1e-3
             annealing_time = s.info['timing']['qpu_anneal_time_per_sample']
-            precision = int(re.findall(r'(?<=precision_)\d+',file)[0])
-            timepoints = int(re.findall(r'(?<=timepoints_)\d+',file)[0])
+            precision = int(re.findall(r'(?<=precision_)\d+', file_path.name)[0])
+            timepoints = int(re.findall(r'(?<=timepoints_)\d+', file_path.name)[0])
             
             df_dict['runtime'].append(qpu_access_time)
             df_dict['ta'].append(annealing_time)
@@ -120,30 +132,40 @@ class ResultsLoader:
         return df
     
 
-    def get_velox_results(self,system: int)->pd.DataFrame:
+    def get_velox_results(self, system: int) -> pd.DataFrame:
         """
         Load Velox results for a given system from CSV and parse relevant fields.
 
         Args:
-            system (int): System identifier.
+            system: System identifier
 
         Returns:
-            pd.DataFrame: DataFrame containing parsed results.
+            DataFrame containing parsed results
         """
-        path = os.path.join(self.base_path, f'{system}/velox/best_results_hessian_{system}_native.csv')
+        path = self.base_path / str(system) / 'velox' / f'best_results_hessian_{system}_native.csv'
+        
+        if not path.exists():
+            return pd.DataFrame()
+        
         df = pd.read_csv(path)
-        df_dict= defaultdict(list)
+        df_dict = defaultdict(list)
+        
+        # Process each row
         for row in df.itertuples():
-            precision, timepoints = re.findall(r'\d+',str(row.instance))
+            # Extract precision and timepoints using regex
+            precision, timepoints = re.findall(r'\d+', str(row.instance))
             df_dict['precision'].append(int(precision))
             df_dict['timepoints'].append(int(timepoints))
-            df_dict['num_steps'].append(int(row.num_steps))
-            df_dict['runtime'].append(float(row.runtime)*1e3)
-            df_dict['gap'].append(float(row.gap))
-            df_dict['num_rep'].append(int(row.num_rep))
-            df_dict['success_prob'].append(float(row.success_prob))
-            df_dict['solution'].append(row.best_solution.replace("-1","0").replace(';',''))
-            df_dict['num_var'].append(int(row.num_var))
+            
+            # Convert and append other fields
+            df_dict['num_steps'].append(int(str(row.num_steps)))
+            df_dict['runtime'].append(float(str(row.runtime)) * 1e3)
+            df_dict['gap'].append(float(str(row.gap)))
+            df_dict['num_rep'].append(int(str(row.num_rep)))
+            df_dict['success_prob'].append(float(str(row.success_prob)))
+            df_dict['solution'].append(str(row.best_solution).replace("-1", "0").replace(';', ''))
+            df_dict['num_var'].append(int(str(row.num_var)))
+        
         return pd.DataFrame(df_dict)
 
     def get_velox_tts(self,system:int)->pd.DataFrame:
@@ -164,84 +186,136 @@ class ResultsLoader:
         return df
     
 
-    def get_dwave_success_rates(self,system: int,topology="6.4",ta=200,grouped=True,file_limit=np.inf)->pd.DataFrame:
+    def get_dwave_success_rates(self, system: int, topology: str = "6.4", 
+                               ta: int = 200, grouped: bool = True, 
+                               file_limit: float = np.inf) -> pd.DataFrame:
         """
         Load D-Wave success rates for a given system and topology.
 
         Args:
-            system (int): System identifier.
-            topology (str): Topology string.
-            ta (int): Annealing time.
-            grouped (bool): If True, group results by precision, timepoints, topology.
-            file_limit (int): Maximum number of files to process.
+            system: System identifier
+            topology: Topology string
+            ta: Annealing time
+            grouped: If True, group results by precision, timepoints, topology
+            file_limit: Maximum number of files to process
 
         Returns:
-            pd.DataFrame: DataFrame containing success rates and related info.
+            DataFrame containing success rates and related info
         """
-        path = os.path.join(self.base_path, str(system),topology)
-        dfs = []
+        path = self.base_path / str(system) / topology
+        
+        if not path.exists():
+            return pd.DataFrame()
+            
         df_dict = defaultdict(list)
-        for topology in [topology]:
-            path = os.path.join(self.base_path, str(system),topology)
+        file_counter = 0
 
-            file_counter = 0
-            for file in os.listdir(path):
-                if file_counter >= file_limit:
-                    break
-                with open(os.path.join(path,file),'r') as f:
-                    s = dimod.SampleSet.from_serializable(json.load(f))
+        for file_path in path.glob('*.json'):
+            if file_counter >= file_limit:
+                break
                 
-                if topology=='neal':
-                    qpu_access_time = s.info['timing']['sampling_ns']
-                    annealing_time = 0
-                else:
-                    qpu_access_time = s.info['timing']['qpu_access_time']
-                    annealing_time = s.info['timing']['qpu_anneal_time_per_sample']
-                    if not ta == annealing_time:
-                        continue
+            try:
+                with file_path.open('r') as f:
+                    sample_set = dimod.SampleSet.from_serializable(json.load(f))
+            except Exception:
+                continue
                 
-                file_counter+=1
-                
-                df_dict['precision'].append(int(re.findall(r'(?<=precision_)\d+',file)[0]))
-                df_dict['timepoints'].append(int(re.findall(r'(?<=timepoints_)\d+',file)[0]))
-                df = s.to_pandas_dataframe()
-                df['energy'] = abs(round(df['energy'],10))
-                df = df[['energy','num_occurrences']].groupby(by=["energy"]).sum().reset_index()
-                if len(df[df.energy== 0]) == 0:
-                    success_rate = 0.0
-                else:
-                    success_rate = int(df[df.energy == 0]['num_occurrences'].iloc[0])
-                success_rate /= df['num_occurrences'].sum()
-                access_time = qpu_access_time / df['num_occurrences'].sum() * 1e-3
-                df_dict['topology'].append(topology)
-                df_dict['success_prob'].append(success_rate)
-                df_dict['runtime'].append(access_time)
-                df_dict['num_var'].append(len(s.variables))
-                dfs.append(pd.DataFrame(df_dict))
-        dfs_all = pd.concat(dfs)
+            # Handle different timing information based on solver
+            if topology == 'neal':
+                qpu_access_time = sample_set.info['timing']['sampling_ns']
+                annealing_time = 0
+            else:
+                qpu_access_time = sample_set.info['timing']['qpu_access_time']
+                annealing_time = sample_set.info['timing']['qpu_anneal_time_per_sample']
+                if not ta == annealing_time:
+                    continue
+            
+            file_counter += 1
+            
+            # Extract metadata from filename
+            precision = int(re.findall(r'(?<=precision_)\d+', file_path.name)[0])
+            timepoints = int(re.findall(r'(?<=timepoints_)\d+', file_path.name)[0])
+            
+            # Process sample set data
+            df = sample_set.to_pandas_dataframe()
+            df['energy'] = abs(round(df['energy'], 10))
+            df = df[['energy', 'num_occurrences']].groupby('energy').sum().reset_index()
+            
+            # Calculate success rate
+            total_occurrences = df['num_occurrences'].sum()
+            success_occurrences = df[df.energy == 0]['num_occurrences'].iloc[0] if len(df[df.energy == 0]) > 0 else 0
+            success_rate = float(success_occurrences) / total_occurrences
+            
+            # Calculate access time per sample
+            access_time = qpu_access_time / total_occurrences * 1e-3
+            
+            # Store results
+            df_dict['precision'].append(precision)
+            df_dict['timepoints'].append(timepoints)
+            df_dict['topology'].append(topology)
+            df_dict['success_prob'].append(success_rate)
+            df_dict['runtime'].append(access_time)
+            df_dict['num_var'].append(len(sample_set.variables))
+            
+        # Convert results to DataFrame
+        results_df = pd.DataFrame(df_dict)
+        
+        if results_df.empty:
+            return results_df
+            
+        # Group results if requested
         if grouped:
-            dfs_all = dfs_all.groupby(['precision','timepoints','topology']).mean().reset_index()
-        return dfs_all
+            results_df = results_df.groupby(['precision', 'timepoints', 'topology']).mean().reset_index()
+            
+        return results_df
     
 
-    def get_dwave_sample_set(self,system: int, timepoints: int, topology="1.4") -> pd.DataFrame:
-        path = os.path.join(self.base_path, str(system),topology)
+    def get_dwave_sample_set(self, system: int, timepoints: int, topology: str = "1.4") -> dimod.SampleSet:
+        """
+        Get the best D-Wave sample set for a given system configuration.
+
+        Args:
+            system: System identifier
+            timepoints: Number of timepoints
+            topology: D-Wave topology to use
+
+        Returns:
+            The best sample set found (lowest energy)
+
+        Raises:
+            ValueError: If no samples are found for the given configuration
+        """
+        path = self.base_path / str(system) / topology
+        
+        if not path.exists():
+            raise ValueError(f"Path does not exist: {path}")
+            
         min_energy = np.inf
-        return_sample =None
-        for file in os.listdir(path):
-            file_tp = int(re.findall(r'(?<=timepoints_)\d+',file)[0])
-            if not file_tp == timepoints:
+        best_sample = None
+        
+        for file_path in path.glob('*.json'):
+            # Check if this file matches the requested timepoints
+            file_timepoints = int(re.findall(r'(?<=timepoints_)\d+', file_path.name)[0])
+            if file_timepoints != timepoints:
                 continue
 
-            with open(os.path.join(path,file),'r') as f:
-                s = dimod.SampleSet.from_serializable(json.load(f))
+            with file_path.open('r') as f:
+                sample_set = dimod.SampleSet.from_serializable(json.load(f))
             
-            if np.round(s.first.energy,12) == 0:
-                return s
-            elif s.first.energy < min_energy:
-                return_sample = s
-                min_energy =s.first.energy
-        if return_sample is None:
-            raise ValueError('No samples for system/timepoints/topology combination found')
-        else:
-            return return_sample
+            # Convert to dataframe to get first sample's energy
+            first_sample = sample_set.to_pandas_dataframe().iloc[0]
+            sample_energy = abs(first_sample['energy'])
+            
+            # If we find a solution with zero energy, return it immediately
+            if sample_energy < 1e-12:  # Use small threshold instead of exact 0
+                return sample_set
+                
+            # Otherwise, keep track of the lowest energy solution
+            if sample_energy < min_energy:
+                best_sample = sample_set
+                min_energy = sample_energy
+        
+        if best_sample is None:
+            raise ValueError(f'No samples found for system={system}, timepoints={timepoints}, topology={topology}')
+            
+        return best_sample
