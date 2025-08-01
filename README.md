@@ -21,6 +21,7 @@ This project provides tools for:
 ### Requirements
 - Python 3.11+
 - Poetry (recommended) or pip
+
 It is recommended to use a python virtual environment.
 ### Using Poetry (recommended)
 ```bash
