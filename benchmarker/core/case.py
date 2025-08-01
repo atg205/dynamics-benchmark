@@ -101,7 +101,7 @@ class QuantumTestCase(TestCase):
         with time_path.open('r') as f:
             at_dict = json.load(f)
         at_dict['time_ms'] += at
-        with time_path.open('r+') as f:
+        with time_path.open('w') as f:
             json.dump(at_dict, f)
 
     def sample_qubo(self, qubo):

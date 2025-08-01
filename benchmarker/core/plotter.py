@@ -88,7 +88,7 @@ class BenchmarkPlotter:
         plt.show(block=True)
         #plt.close()
 
-    def plot_tts(self, systems: List[int] = [1,2,5,6,7], file_limit: int = 20):
+    def plot_tts(self, systems: List[int] = [1,2,4,5,6,7], file_limit: int = 20,num_reps=0):
         """Plot time-to-solution comparisons for multiple systems."""
         self._setup_style(grid=True)
         fig, ax = plt.subplots(figsize=(8, 4))
@@ -99,8 +99,8 @@ class BenchmarkPlotter:
 
         for idx, system in tqdm(enumerate(systems),total=len(systems)):
             velox_tts = loader.get_velox_tts(system)
-            dwave_14_tts = loader.get_dwave_tts(system,topology='1.4',file_limit=file_limit)
-            dwave_64_tts = loader.get_dwave_tts(system,topology='6.4',file_limit=file_limit)
+            dwave_14_tts = loader.get_dwave_tts(system,topology='1.4',file_limit=file_limit,num_reps=num_reps)
+            dwave_64_tts = loader.get_dwave_tts(system,topology='6.4',file_limit=file_limit,num_reps=num_reps)
 
             color = colors[idx % len(colors)]
             ax.plot(velox_tts['num_var'], velox_tts['tts99'],

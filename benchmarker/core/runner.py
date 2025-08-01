@@ -1,7 +1,7 @@
 from typing import List, Dict, Any
 from .case import TestCase, PegasusNativeSystemsCase
 from .results import BenchmarkResult
-
+from tqdm import tqdm
 class BenchmarkRunner:
     """
     Runs a suite of TestCase instances and collects their results.
@@ -18,7 +18,7 @@ class BenchmarkRunner:
         return self.results 
     
     def run_and_save(self):
-        for case in self.test_cases:
+        for case in tqdm(self.test_cases,total=len(self.test_cases)):
             case.run_and_save()
 
     def summary(self) -> Dict[str, Any]:
