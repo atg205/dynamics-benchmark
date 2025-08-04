@@ -121,20 +121,23 @@ class ResultsLoader:
             df_dict['num_var'].append(len(s.variables))
             sampleset = s.to_pandas_dataframe()
             sampleset['energy'] = abs(round(sampleset['energy'],10))
-            success = len(sampleset[sampleset.energy== 0]) > 0
+            if len(sampleset[sampleset.energy== 0]) == 0:
+                success_rate = 0.0
+            else:
+                success_rate = int(sampleset[sampleset.energy == 0]['num_occurrences'].iloc[0])
+            success_rate /= sampleset['num_occurrences'].sum()
             
-            df_dict['success'].append(success)
+            df_dict['success'].append(success_rate)
         
         df = pd.DataFrame.from_dict(df_dict)
         if df.empty:
             raise ValueError('no data found')
-        #return df
+
         df =df.groupby(['ta','precision','timepoints','num_var']).agg(
-            success_sum=('success','sum'),
+            success_prob=('success','mean'),
             runtime=('runtime','mean'),
-            shots=('success','count')
         ).reset_index()
-        df['success_prob'] = df['success_sum'] / df['shots']
+
         df['tts99'] = df.apply(lambda row: self.return_tts(row['success_prob'],row.runtime),axis=1)
         df = df[['precision','timepoints','num_var','tts99']].groupby(['precision','timepoints','num_var']).min().reset_index()
         df['source'] = topology

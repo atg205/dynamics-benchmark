@@ -88,7 +88,7 @@ class BenchmarkPlotter:
         plt.show(block=True)
         #plt.close()
 
-    def plot_tts(self, systems: List[int] = [1,2,3,4,5,6,7], file_limit: int = 20,num_reps=0):
+    def plot_tts(self, systems: List[int] = [1,2,4,5,6,7], file_limit: int = 20,num_reps=0):
         """Plot time-to-solution comparisons for multiple systems."""
         self._setup_style(grid=True)
         fig, ax = plt.subplots(figsize=(8, 4))
@@ -102,22 +102,32 @@ class BenchmarkPlotter:
             dwave_14_tts = loader.get_dwave_tts(system,topology='1.4',file_limit=file_limit,num_reps=num_reps)
             dwave_64_tts = loader.get_dwave_tts(system,topology='6.4',file_limit=file_limit,num_reps=num_reps)
 
+
             color = colors[idx % len(colors)]
-            ax.plot(velox_tts['num_var'], velox_tts['tts99'],
-                    marker='o', linestyle='None', color=colors[0], label=f'velox' if system==0 else None)
-            
-            ax.plot(dwave_14_tts['num_var'], dwave_14_tts['tts99'],
-                    marker='s', linestyle='None', color=colors[1],label='14' if system==0 else None)
-            
-            ax.plot(dwave_64_tts['num_var'], dwave_64_tts['tts99'],
-                    marker='^', linestyle='None', color=colors[2],label='64' if system==0 else None)
+
             ALL_dfs.append(velox_tts)
             ALL_dfs.append(dwave_14_tts)
             ALL_dfs.append(dwave_64_tts)
 
+
+
         sources = ['VELOX','1.4', '6.4']
         linestyles = ['-','-','-']
         all_system_dfs = pd.concat(ALL_dfs,axis=0)
+        all_system_dfs_grouped = all_system_dfs[['tts99','num_var','source']].groupby(['num_var','source']).mean().reset_index()
+        velox_tts= all_system_dfs_grouped[all_system_dfs_grouped.source =='VELOX']
+        dwave_14_tts= all_system_dfs_grouped[all_system_dfs_grouped.source =='1.4']
+        dwave_64_tts= all_system_dfs_grouped[all_system_dfs_grouped.source =='6.4']
+
+
+        ax.plot(velox_tts['num_var'], velox_tts['tts99'],
+                    marker='o', linestyle='None', color=colors[0], label=f'velox' if system==0 else None)
+            
+        ax.plot(dwave_14_tts['num_var'], dwave_14_tts['tts99'],
+                    marker='s', linestyle='None', color=colors[1],label='14' if system==0 else None)
+            
+        ax.plot(dwave_64_tts['num_var'], dwave_64_tts['tts99'],
+                    marker='^', linestyle='None', color=colors[2],label='64' if system==0 else None)
 
 
         for i,source in enumerate(sources):
