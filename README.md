@@ -25,7 +25,7 @@ This project provides tools for:
 It is recommended to use a python virtual environment.
 
 ### Solver access
-To perform calculation, solver API access is required. See [D-Wave help pages](https://support.dwavesys.com/hc/en-us/articles/360003682634-How-Do-I-Get-an-API-Token)
+To perform calculation, solver API access is required. See [D-Wave help pages](https://support.dwavesys.com/hc/en-us/articles/360003682634-How-Do-I-Get-an-API-Token).
 ### Using Poetry (recommended)
 ```bash
 # Clone the repository
