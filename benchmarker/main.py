@@ -10,13 +10,13 @@ test_cases=[
         system=system,
         sampler=sampler,
         timepoints=timepoints,
-        ta=500,
+        ta=200,
         num_reps=1000
     ) 
-    for system in [1,2,3,4,5,6,7,8] 
+    for system in [4,5,6,7] 
     for timepoints in range(2,6) 
-    for sampler in ['neal'] 
-    for _ in range(1)
+    for sampler in ['1.4','6.4'] 
+    for _ in range(5)
 ]
 
 

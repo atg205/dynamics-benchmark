@@ -126,14 +126,15 @@ class ResultsLoader:
                 #df_dict['num_var'].append(len(s.variables))
             df_dict['num_var'].append(len(s.variables))
             sampleset = s.to_pandas_dataframe()
-            sampleset['energy'] = abs(round(sampleset['energy'],10))
+            sampleset['energy'] = abs(round(sampleset['energy'],14))
             if len(sampleset[sampleset.energy== 0]) == 0:
                 success_rate = 0.0
             else:
-                success_rate = int(sampleset[sampleset.energy == 0]['num_occurrences'].iloc[0])
+                success_rate = int(sampleset[sampleset.energy == 0]['num_occurrences'].sum())
             success_rate /= sampleset['num_occurrences'].sum()
             
             df_dict['success'].append(success_rate)
+            print(file_counter)
         
         df = pd.DataFrame.from_dict(df_dict)
         if df.empty:

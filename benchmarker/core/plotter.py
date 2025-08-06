@@ -109,6 +109,7 @@ class BenchmarkPlotter:
             ALL_dfs.append(dwave_64_tts)
             ALL_dfs.append(neal_tts)
 
+
         sources = ['VELOX', '1.4', '6.4','neal']
         linestyles = ['-', '-', '-','-']
         all_system_dfs = pd.concat(ALL_dfs, axis=0)
@@ -119,7 +120,6 @@ class BenchmarkPlotter:
             
             # Group by num_var and calculate mean and std for tts99
             grouped = native_system_df_filtered.groupby('num_var')['tts99'].agg(['mean', 'std', 'count']).reset_index()
-            print(grouped)
             # Filter out NaN/infinite values
             mask = np.isfinite(grouped['mean'])
             grouped_clean = grouped[mask]
