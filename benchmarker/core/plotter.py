@@ -88,74 +88,222 @@ class BenchmarkPlotter:
         plt.show(block=True)
         #plt.close()
 
-    def plot_tts(self, systems: List[int] = [1,2,4,5,6,7], file_limit: int = 20,num_reps=0):
+    def plot_tts(self, systems: List[int] = [1,2,5,6,7], file_limit: int = 20, num_reps=0):
         """Plot time-to-solution comparisons for multiple systems."""
-        self._setup_style(grid=True)
-        fig, ax = plt.subplots(figsize=(8, 4))
-        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
-                 '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+
+        ta = 200
+        self._setup_style(fontsize=16, grid=True)
+        fig, ax = plt.subplots(figsize=(5.5, 4))
+        colors = plt.cm.tab10.colors  # Use tab10 colormap for better consistency
+        
         ALL_dfs = []
         loader = results_loader.ResultsLoader()
 
-        for idx, system in tqdm(enumerate(systems),total=len(systems)):
+        for _, system in tqdm(enumerate(systems), total=len(systems)):
             velox_tts = loader.get_velox_tts(system)
-            dwave_14_tts = loader.get_dwave_tts(system,topology='1.4',file_limit=file_limit,num_reps=num_reps)
-            dwave_64_tts = loader.get_dwave_tts(system,topology='6.4',file_limit=file_limit,num_reps=num_reps)
+            dwave_14_tts = loader.get_dwave_tts(system, topology='1.4', file_limit=file_limit, ta=200,num_reps=num_reps)
+            dwave_64_tts = loader.get_dwave_tts(system, topology='6.4', file_limit=file_limit, ta=200,num_reps=num_reps)
+            neal_tts = loader.get_dwave_tts(system, topology='neal', file_limit=file_limit, num_reps=num_reps)
+            ALL_dfs.append(velox_tts)
+            ALL_dfs.append(dwave_14_tts)
+            ALL_dfs.append(dwave_64_tts)
+            ALL_dfs.append(neal_tts)
 
+        sources = ['VELOX', '1.4', '6.4','neal']
+        linestyles = ['-', '-', '-','-']
+        all_system_dfs = pd.concat(ALL_dfs, axis=0)
+        native_system_df = all_system_dfs[all_system_dfs.system.isin(systems)]
 
-            color = colors[idx % len(colors)]
+        for i, source in enumerate(sources):
+            native_system_df_filtered = native_system_df[native_system_df.source == source]
+            
+            # Group by num_var and calculate mean and std for tts99
+            grouped = native_system_df_filtered.groupby('num_var')['tts99'].agg(['mean', 'std', 'count']).reset_index()
+            print(grouped)
+            # Filter out NaN/infinite values
+            mask = np.isfinite(grouped['mean'])
+            grouped_clean = grouped[mask]
+            
+            num_var_clean = np.array(grouped_clean['num_var'])
+            tts99_mean = np.array(grouped_clean['mean'])
+            tts99_std = np.array(grouped_clean['std'])
+            
+            # Handle cases where std is NaN (only one data point)
+            tts99_std = np.where(np.isnan(tts99_std), 0, tts99_std)
+            
+            # Plot points
+            ax.plot(
+                num_var_clean,
+                tts99_mean,
+                marker=['o', 's', '^','x'][i],
+                linestyle='',
+                color=colors[i],
+                label=['VeloxQ', 'Advantage2 1.4', 'Advantage 6.4','neal'][i],
+                markersize=8,
+                alpha=0.8,
+            )
+            
+            # Fit exponential trend to averaged data
+            if len(num_var_clean) > 1:
+                log_tts99_mean = np.log(tts99_mean)
+                slope, intercept, r_value, p_value, std_err = linregress(num_var_clean, log_tts99_mean)
+                
+                r_TTS99 = slope
+                D = np.exp(intercept)
+                
+                # Generate smooth curve for fit
+                num_var_fit = np.linspace(num_var_clean.min(), num_var_clean.max(), 100)
+                TTS99_fit = D * np.exp(r_TTS99 * num_var_fit)
+                
+                ax.plot(
+                    num_var_fit, TTS99_fit, 
+                    linestyle=linestyles[i], 
+                    color=colors[i], 
+                    alpha=0.7
+                )
+                
+                # Add equation annotation
+                mid_x = 1.1 * (num_var_clean.min() + num_var_clean.max()) / 2
+                mid_y = D * np.exp(r_TTS99 * mid_x)
+                
+                # Format equation text
+                eq_text = rf"$\propto e^{{\frac{{N}}{{{1/r_TTS99:.1f}}}}}$" if abs(r_TTS99) > 0.001 else rf"$\propto \mathrm{{const}}$"
+                
+                ax.annotate(
+                    eq_text,
+                    xy=(mid_x, mid_y * [1.3, 1.2, 0.8,0.7][i]),
+                    fontsize=24,
+                    color=colors[i],
+                    rotation=[0, 5, 30, 0][i],
+                    ha='center',
+                    va='bottom'
+                )
+
+        # Place legend inside the plot
+        ax.legend(
+            loc='upper right',
+            ncol=1,
+            fontsize=13,
+            framealpha=1.0,
+            handlelength=1
+        )
+        
+        ax.set_xlabel(r"$N$")
+        ax.set_ylabel(r"$\mathrm{TTS}_{\rm 99}$ [ms]")
+        ax.set_yscale("log")
+        #ax.set_ylim(1e1, 1e4)
+        ax.grid(True)
+        
+        plt.tight_layout()  # No need for extra space since legend is inside
+        plt.savefig(f"{self.output_dir}/tta_overview.pdf", bbox_inches="tight")
+        plt.show(block=True)
+
+    def plot_tts_horizontal_legend(self, systems: List[int] = [1,2,5,6,7], file_limit: int = 20, num_reps=0):
+        """Plot time-to-solution comparisons for multiple systems with horizontal legend above."""
+        self._setup_style(fontsize=16, grid=True)
+        fig, ax = plt.subplots(figsize=(5, 4))
+        colors = plt.cm.tab10.colors  # Use tab10 colormap for better consistency
+        
+        ALL_dfs = []
+        loader = results_loader.ResultsLoader()
+
+        for idx, system in tqdm(enumerate(systems), total=len(systems)):
+            velox_tts = loader.get_velox_tts(system)
+            dwave_14_tts = loader.get_dwave_tts(system, topology='1.4', file_limit=file_limit, num_reps=num_reps)
+            dwave_64_tts = loader.get_dwave_tts(system, topology='6.4', file_limit=file_limit, num_reps=num_reps)
 
             ALL_dfs.append(velox_tts)
             ALL_dfs.append(dwave_14_tts)
             ALL_dfs.append(dwave_64_tts)
 
+        sources = ['VELOX', '1.4', '6.4']
+        linestyles = ['-', '-', '-']
+        all_system_dfs = pd.concat(ALL_dfs, axis=0)
+        native_system_df = all_system_dfs[all_system_dfs.system.isin(systems)]
 
-
-        sources = ['VELOX','1.4', '6.4']
-        linestyles = ['-','-','-']
-        all_system_dfs = pd.concat(ALL_dfs,axis=0)
-        all_system_dfs_grouped = all_system_dfs[['tts99','num_var','source']].groupby(['num_var','source']).mean().reset_index()
-        velox_tts= all_system_dfs_grouped[all_system_dfs_grouped.source =='VELOX']
-        dwave_14_tts= all_system_dfs_grouped[all_system_dfs_grouped.source =='1.4']
-        dwave_64_tts= all_system_dfs_grouped[all_system_dfs_grouped.source =='6.4']
-
-
-        ax.plot(velox_tts['num_var'], velox_tts['tts99'],
-                    marker='o', linestyle='None', color=colors[0], label=f'velox' if system==0 else None)
+        for i, source in enumerate(sources):
+            native_system_df_filtered = native_system_df[native_system_df.source == source]
             
-        ax.plot(dwave_14_tts['num_var'], dwave_14_tts['tts99'],
-                    marker='s', linestyle='None', color=colors[1],label='14' if system==0 else None)
+            # Group by num_var and calculate mean and std for tts99
+            grouped = native_system_df_filtered.groupby('num_var')['tts99'].agg(['mean', 'std', 'count']).reset_index()
             
-        ax.plot(dwave_64_tts['num_var'], dwave_64_tts['tts99'],
-                    marker='^', linestyle='None', color=colors[2],label='64' if system==0 else None)
+            # Filter out NaN/infinite values
+            mask = np.isfinite(grouped['mean'])
+            grouped_clean = grouped[mask]
+            
+            num_var_clean = np.array(grouped_clean['num_var'])
+            tts99_mean = np.array(grouped_clean['mean'])
+            tts99_std = np.array(grouped_clean['std'])
+            
+            # Handle cases where std is NaN (only one data point)
+            tts99_std = np.where(np.isnan(tts99_std), 0, tts99_std)
+            
+            # Plot points
+            ax.plot(
+                num_var_clean,
+                tts99_mean,
+                marker=['o', 's', '^'][i],
+                linestyle='',
+                color=colors[i],
+                label=['VeloxQ', 'Advantage2 1.4', 'Advantage 6.4'][i],
+                markersize=8,
+                alpha=0.8,
+            )
+            
+            # Fit exponential trend to averaged data
+            if len(num_var_clean) > 1:
+                log_tts99_mean = np.log(tts99_mean)
+                slope, intercept, r_value, p_value, std_err = linregress(num_var_clean, log_tts99_mean)
+                
+                r_TTS99 = slope
+                D = np.exp(intercept)
+                
+                # Generate smooth curve for fit
+                num_var_fit = np.linspace(num_var_clean.min(), num_var_clean.max(), 100)
+                TTS99_fit = D * np.exp(r_TTS99 * num_var_fit)
+                
+                ax.plot(
+                    num_var_fit, TTS99_fit, 
+                    linestyle=linestyles[i], 
+                    color=colors[i], 
+                    alpha=0.7
+                )
+                
+                # Add equation annotation
+                mid_x = 1.1 * (num_var_clean.min() + num_var_clean.max()) / 2
+                mid_y = D * np.exp(r_TTS99 * mid_x)
+                
+                # Format equation text
+                eq_text = rf"$\propto e^{{{r_TTS99:.3f}  N}}$" if abs(r_TTS99) > 0.001 else rf"$\propto \mathrm{{const}}$"
+                
+                ax.annotate(
+                    eq_text,
+                    xy=(mid_x, mid_y * [1.3, 1.2, 0.8,0.7][i]),
+                    fontsize=18,
+                    color=colors[i],
+                    rotation=[0, 5, 30][i],
+                    ha='center',
+                    va='bottom'
+                )
 
-
-        for i,source in enumerate(sources):
-
-            df_filtered = all_system_dfs[all_system_dfs.source == source]
-            num_var = np.array(df_filtered['num_var'])       
-            TTS99 = np.array(df_filtered['tts99'])           
-
-            mask = np.isfinite(TTS99)
-            num_var_clean = num_var[mask]
-            TTS99_clean = TTS99[mask]
-            log_TTS99 = np.log(TTS99_clean)
-
-            slope, intercept, r_value, p_value, std_err = linregress(num_var_clean, log_TTS99)
-
-            r_TTS99 = slope
-            D =np.exp(intercept)
-            t = D * np.exp(r_TTS99 * num_var)
-
-            TTS99_fit = D * np.exp(r_TTS99 * num_var)
-            ax.plot(num_var, TTS99_fit, linestyle=linestyles[i], color=colors[i], label=f'{source} r_TTS99={abs(np.round(r_TTS99,2))}')    
-
-        plt.legend()
-        ax.set_xlabel(r'$N$')
-        ax.set_ylabel('TTS99 [ms]')
-        plt.yscale('log')
-        plt.tight_layout()
-        plt.savefig(f'{self.output_dir}/tta_overview.pdf' ,bbox_inches='tight')
+        # Place legend above the plot in one row
+        ax.legend(
+            bbox_to_anchor=(0., 1.02, 1., .102),
+            loc='lower center',
+            ncol=3,  # Force all items in one row
+            fontsize=13,
+            mode="expand",
+            borderaxespad=0.,
+            handlelength=1
+        )
+        
+        ax.set_xlabel(r"$N$")
+        ax.set_ylabel(r"$\mathrm{TTS}_{\rm 99}$ [ms]")
+        ax.set_yscale("log")
+        ax.grid(True)
+        
+        plt.tight_layout(rect=(0, 0, 1, 0.90))  # Make room for the legend
+        plt.savefig(f"{self.output_dir}/tta_overview_horizontal_legend.pdf", bbox_inches="tight")
         plt.show(block=True)
 
     def plot_success_prob_by_ta(self, system:int,annealing_times=[10,100,200,500],timepoints_of_interest=[2,3]):

@@ -83,7 +83,7 @@ class ResultsLoader:
         return (math.log(1-p_target) / math.log(1-p_success))*t
 
 
-    def get_dwave_tts(self, system: int, topology: str = "6.4", file_limit: float = np.inf, num_reps=0) -> pd.DataFrame:
+    def get_dwave_tts(self, system: int, topology: str = "6.4", file_limit: float = np.inf, num_reps=0,ta=0) -> pd.DataFrame:
         """Get D-Wave time-to-solution data for a specific system and topology."""
         path = self.base_path / str(system) / topology
         df_dict = defaultdict(list)
@@ -100,11 +100,17 @@ class ResultsLoader:
                 continue
           
             # Append Metadata
-            qpu_access_time = s.info['timing']['qpu_access_time'] * 1e-3
-            annealing_time = s.info['timing']['qpu_anneal_time_per_sample']
+            if topology == 'neal':
+                qpu_access_time = s.info['timing']['sampling_ns'] * 1e-6
+                annealing_time = 0
+
+            else:
+                qpu_access_time = s.info['timing']['qpu_access_time'] * 1e-3
+                annealing_time = s.info['timing']['qpu_anneal_time_per_sample']
+
             precision = int(re.findall(r'(?<=precision_)\d+', file_path.name)[0])
             timepoints = int(re.findall(r'(?<=timepoints_)\d+', file_path.name)[0])
-            if file_counter[(system, timepoints)] >= file_limit:
+            if file_counter[(system, timepoints)] >= file_limit or annealing_time != ta:
                 continue
             file_counter[(system,timepoints)] += 1
             
@@ -133,13 +139,14 @@ class ResultsLoader:
         if df.empty:
             raise ValueError('no data found')
 
-        df =df.groupby(['ta','precision','timepoints','num_var']).agg(
-            success_prob=('success','mean'),
-            runtime=('runtime','mean'),
-        ).reset_index()
+        #df =df.groupby(['ta','precision','timepoints','num_var']).agg(
+         #   success_prob=('success','mean'),
+         #   runtime=('runtime','mean'),
+        #).reset_index()
 
-        df['tts99'] = df.apply(lambda row: self.return_tts(row['success_prob'],row.runtime),axis=1)
-        df = df[['precision','timepoints','num_var','tts99']].groupby(['precision','timepoints','num_var']).min().reset_index()
+        df = df[['precision','timepoints','num_var','success','runtime']].groupby(['precision','timepoints','num_var']).mean().reset_index()
+        df['tts99'] = df.apply(lambda row: self.return_tts(row['success'],row.runtime),axis=1)
+
         df['source'] = topology
         df['system'] = system
         return df
