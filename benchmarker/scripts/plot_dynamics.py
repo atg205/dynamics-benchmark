@@ -19,15 +19,26 @@ def main():
         required=True,
         help='Number of time points in the simulation'
     )
+
+    parser.add_argument(
+        '--topology',
+        type=str,
+        required=False,
+        default='1.4',
+        help='Topology ID, possible values "6.4", "1.4", "neal", "VELOX"'
+    )
     
     # Parse arguments
     args = parser.parse_args()
     
+
     # Create plotter and generate plot
     plotter_instance = plotter.BenchmarkPlotter()
     plotter_instance.plot_dynamics(
+
         system=args.system,
-        timepoints=args.timepoints
+        timepoints=args.timepoints,
+        solver=args.topology
     )
 
 if __name__ == "__main__":

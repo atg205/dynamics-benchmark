@@ -367,7 +367,7 @@ class BenchmarkPlotter:
             plt.show()
 
 
-    def plot_dynamics(self, system,timepoints=3):
+    def plot_dynamics(self, system, timepoints=3, solver='6.4'):
         loader = results_loader.ResultsLoader()
 
         SZ = np.array([[1, 0], [0, -1]])
@@ -395,20 +395,40 @@ class BenchmarkPlotter:
             if dim== 2:
                 ax.plot(times, baseline[1], "k--")
 
-            dw_result = loader.get_dwave_sample_set(system,timepoints=timepoints)
+            # Get results based on solver type
+            if solver == "VELOX":
+                solution_df = loader.get_velox_results(system,timepoints=timepoints)
+                vec_list = []
+                energy_list = []
+                for idx in range(3):
+                    raw_sample = solution_df['solution'].values[idx]    
+                    gap = round(solution_df['gap'].values[idx],ndigits=2)
+                    sample_str = loader.result_string_to_dict(raw_sample)
+                    vec_list.append(problem.interpret_sample(sample_str))
+                    energy_list.append(gap)
 
-            for idx,sample in enumerate(list(dw_result.samples(3))[::-1]):
-                dw_vec = problem.interpret_sample(sample)
-                energy = list(dw_result.to_pandas_dataframe()[0:3][::-1]['energy'])[idx]
-                expect_00 = [(state.conj() @ P_00.full() @ state).real for state in dw_vec]
-                expect_11 = [(state.conj() @ P_11.full() @ state).real for state in dw_vec]
+            elif solver in ["6.4", "1.4", "neal"] or solver is None:
+                dw_result = loader.get_dwave_sample_set(system, timepoints=timepoints, topology=solver)
+
+                dw_sample_list = list(dw_result.samples(3)) 
+                energy_list = list(dw_result.to_pandas_dataframe().sort_values(by='energy')[0:3]['energy'])
+                vec_list = [problem.interpret_sample(sample) for sample in dw_sample_list]
+            else:
+                raise ValueError(f"Unsupported solver: {solver}")
+
+            
+            
+
+            for idx in range(2,-1,-1):
+                expect_00 = [(state.conj() @ P_00.full() @ state).real for state in vec_list[idx]]
+                expect_11 = [(state.conj() @ P_11.full() @ state).real for state in vec_list[idx]]
 
                 #axis.scatter(inst_obj.problem.times, exact_expect, marker="^", lw=2, s=300, edgecolors="b", facecolors="none", label="Exact solver")
                 #axis.scatter(problem.times, sa_expect, marker="o", lw=2, s=100, edgecolors="r", facecolors="none", label="SA sampler")
-                ax.scatter(problem.times, expect_00,color=colors[idx % len(colors)], marker=markers[idx % len(markers)],label=f"Energy: {abs(energy):.2f}",s=70)
+                metric = 'Gap' if solver == 'VELOX' else 'Enery'
+                ax.scatter(problem.times, expect_00,color=colors[idx % len(colors)], marker=markers[idx % len(markers)],label=f"{metric}: {abs(energy_list[idx]):.2f}",s=70)
                 ax.plot(problem.times, expect_00, color=colors[idx % len(colors)], alpha=0.5, linewidth=0.3)
                 if dim ==2:
-
                     ax.scatter(problem.times, expect_11,color=colors[idx % len(colors)], marker=markers[idx % len(markers)],s=70)
                     ax.plot(problem.times, expect_11, color=colors[idx % len(colors)], alpha=0.5, linewidth=0.3)
                 ax.set_xlabel("t")

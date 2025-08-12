@@ -126,7 +126,8 @@ class ResultsLoader:
                 #df_dict['num_var'].append(len(s.variables))
             df_dict['num_var'].append(len(s.variables))
             sampleset = s.to_pandas_dataframe()
-            sampleset['energy'] = abs(round(sampleset['energy'],14))
+            sampleset['energy'] = round(sampleset['energy'],14)
+            print(s.first.energy)
             if len(sampleset[sampleset.energy== 0]) == 0:
                 success_rate = 0.0
             else:
@@ -153,7 +154,7 @@ class ResultsLoader:
         return df
     
 
-    def get_velox_results(self, system: int) -> pd.DataFrame:
+    def get_velox_results(self, system: int,timepoints = None) -> pd.DataFrame:
         """
         Load Velox results for a given system from CSV and parse relevant fields.
 
@@ -166,6 +167,7 @@ class ResultsLoader:
         path = self.base_path / str(system) / 'velox' / f'best_results_hessian_{system}_native.csv'
         
         if not path.exists():
+            print("path does not exist")
             return pd.DataFrame()
         
         df = pd.read_csv(path)
@@ -174,9 +176,9 @@ class ResultsLoader:
         # Process each row
         for row in df.itertuples():
             # Extract precision and timepoints using regex
-            precision, timepoints = re.findall(r'\d+', str(row.instance))
+            precision, row_timepoints = re.findall(r'\d+', str(row.instance))
             df_dict['precision'].append(int(precision))
-            df_dict['timepoints'].append(int(timepoints))
+            df_dict['timepoints'].append(int(row_timepoints))
             
             # Convert and append other fields
             df_dict['num_steps'].append(int(str(row.num_steps)))
@@ -187,7 +189,11 @@ class ResultsLoader:
             df_dict['solution'].append(str(row.best_solution).replace("-1", "0").replace(';', ''))
             df_dict['num_var'].append(int(str(row.num_var)))
         
-        return pd.DataFrame(df_dict)
+        df = pd.DataFrame(df_dict)
+        if timepoints is not None:
+            df = df[df.timepoints == timepoints]
+            return df
+        return df
 
     def get_velox_tts(self,system:int)->pd.DataFrame:
         """
@@ -291,6 +297,19 @@ class ResultsLoader:
         return results_df
     
 
+    def get_velox_sample_set(self, system: int, timepoints: int):
+        path = self.base_path / str(system) / f'new_best_results_hessian_{system}_native.csv'
+        df = pd.read_csv(path)
+        df_dict= defaultdict(list)
+        for row in df.itertuples():
+            _, row_timepoints = re.findall(r'\d+',str(row.instance))
+            if timepoints != row_timepoints:
+                continue 
+            df_dict['gap'].append(float(row.gap))
+            df_dict['solution'].append(row.best_solution.replace("-1","0").replace(';',''))
+        return pd.DataFrame(df_dict).sort_values('gap',ascending=True).drop_duplicates()
+
+
     def get_dwave_sample_set(self, system: int, timepoints: int, topology: str = "1.4") -> dimod.SampleSet:
         """
         Get the best D-Wave sample set for a given system configuration.
@@ -315,7 +334,6 @@ class ResultsLoader:
         best_sample = None
         
         for file_path in path.glob('*.json'):
-            # Check if this file matches the requested timepoints
             file_timepoints = int(re.findall(r'(?<=timepoints_)\d+', file_path.name)[0])
             if file_timepoints != timepoints:
                 continue
@@ -328,7 +346,7 @@ class ResultsLoader:
             sample_energy = abs(first_sample['energy'])
             
             # If we find a solution with zero energy, return it immediately
-            if sample_energy < 1e-12:  # Use small threshold instead of exact 0
+            if sample_energy < 1e-12: 
                 return sample_set
                 
             # Otherwise, keep track of the lowest energy solution
@@ -340,3 +358,16 @@ class ResultsLoader:
             raise ValueError(f'No samples found for system={system}, timepoints={timepoints}, topology={topology}')
             
         return best_sample
+    
+
+    def result_string_to_dict(self, input_string:str)->dict[int,int]:
+        """
+        Convert a string of bits to a dictionary mapping index to bit value.
+
+        Args:
+            input_string (str): String of bits (e.g., '1010').
+
+        Returns:
+            dict: Dictionary mapping index to bit value.
+        """
+        return {i:int(bit) for i,bit in enumerate(list(input_string))}
